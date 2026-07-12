@@ -15,10 +15,13 @@ wiki-root/
   concepts/          ← abstract ideas, frameworks, methodologies, terms
   sources/           ← external inputs: articles, books, papers, podcasts
   synthesis/         ← cross-cutting analyses spanning 2+ sources
-  notes/             ← personal capture: daily notes, meeting notes, fleeting thoughts
+  notes/             ← personal capture + drop zone for files to sweep (see Sweeping)
+  .wiki-ingest-ledger.json  ← processed-state ledger for the notes sweep (not a page)
 ```
 
-Never create directories outside this structure.
+Never create directories outside this structure. The one permitted non-page file at the
+root is `.wiki-ingest-ledger.json` (see "Sweeping the Notes Folder"). Do not create any
+other files at the root.
 
 ---
 
@@ -130,6 +133,69 @@ When a new source arrives (article, book, paper, podcast, conversation), do thes
 
 Do not skip step 4. The index is the LLM's primary navigation tool; an outdated index breaks all future queries.
 
+**Ingest is idempotent.** Key every source to a stable identity (its `url`/`isbn`, or its
+content hash for a dropped file). Ingesting the same source again must update the pages it
+already produced — never create a second source page or duplicate entity/concept pages for
+it. When re-ingesting changed content, edit the existing pages in place.
+
+**Batch ingest does not stop to ask.** When ingest runs as one file inside a notes sweep,
+fix every lint problem inline (as always) and continue to the next file — never pause to
+ask the user to resolve a lint failure mid-sweep.
+
+---
+
+## Sweeping the Notes Folder (Auto-Ingest)
+
+Users can drop files into `notes/` and have them picked up. This is an **on-demand sweep**,
+not a background watcher: it runs only when you are asked to sweep (e.g. via the `/query`
+skill's startup, a "sweep my notes" request, or at the start of a session if the user asks).
+Nothing runs between sessions.
+
+**The ledger.** `.wiki-ingest-ledger.json` at the wiki root is the sole record of what has
+been processed. It is a JSON object keyed by file path; each entry stores:
+
+```json
+{
+  "notes/some-article.md": {
+    "hash": "<sha256 of the file's current contents>",
+    "kind": "source | note",
+    "pages": ["sources/author-2026-topic", "entities/some-person"]
+  }
+}
+```
+
+`pages` lists the slugs this file produced, so a re-ingest updates exactly those pages.
+
+**To run a sweep:**
+
+1. **Read the ledger** (create an empty `{}` ledger if none exists).
+2. **List every file in `notes/`.** For each file, compute its content hash and compare to
+   the ledger:
+   - **Not in the ledger** → it is new. Process it (step 3), then add a ledger entry.
+   - **In the ledger, hash differs** → it changed. Re-ingest it (step 4).
+   - **In the ledger, hash matches** → skip it; report it as already processed.
+   - If a file's path is gone but a ledger entry's hash matches a different current file,
+     treat it as moved — update the path key, do not re-create pages.
+3. **Process a new file — classify first:**
+   - **External document** (an article, paper, transcript, clipped web page — something
+     that came from outside): run the full ingest procedure above. The source page lands in
+     `sources/`; the original file stays in `notes/` untouched. Record `kind: "source"` and
+     every page slug produced.
+   - **Personal note** (the user's own thought, meeting notes, a daily log): process it per
+     the notes capture rules — update the `## Notes` section of `index.md` if it's a new
+     daily file, scan for promotable content — but do not run the full source ingest.
+     Record `kind: "note"`.
+4. **Re-ingest a changed file:** re-run the same procedure, but **target the pages already
+   listed in that file's ledger entry** — update them in place rather than creating new
+   ones. Add any newly-mentioned entities/concepts; leave unrelated pages alone. Update the
+   entry's `hash` and `pages`.
+5. **Run lint** across everything the sweep created or changed, fixing inline as usual.
+6. **Report** a plain-English summary: new files ingested, files re-ingested, files skipped.
+
+**Never touch the user's files.** The sweep must not edit, rename, move, or delete any file
+in `notes/`. The only thing that records "processed" is the ledger — never write a marker
+into the user's file.
+
 ---
 
 ## Index.md Structure
@@ -173,12 +239,32 @@ This is one flat checklist, not a system of severities. If real use shows you ne
 
 ---
 
+## Answering a Question From the Wiki
+
+When the user asks a question of the wiki — whether by typing `/query <question>` in
+Claude Code, or just asking in chat — answer from the wiki, index-first:
+
+1. **Read `index.md` first.** Use it to pick the pages relevant to the question.
+2. **Open those pages** and read their contents.
+3. **Answer from the pages,** and **cite the page slugs** you drew from so the user can
+   verify and navigate.
+4. **If the index has nothing relevant,** say so plainly and offer to ingest a source —
+   do not fabricate an answer.
+
+Use only generic file reads and the index. Never build a search index or use embeddings.
+
+---
+
 ## What Not to Do
 
-- Do not create files outside the five content directories.
+- Do not create files outside the five content directories (the one exception is the
+  `.wiki-ingest-ledger.json` file at the root).
 - Do not use dates in filenames.
 - Do not link to pages that do not yet exist — create a stub first.
 - Do not modify `CLAUDE.md` or `schema.md` during an ingest.
 - Do not skip `index.md` updates.
 - Do not create a synthesis page from a single source — that is a concept or source page.
 - Do not ask the user to resolve lint failures — fix them inline.
+- Do not edit, rename, move, or delete a user's file in `notes/` during a sweep — record
+  processed state only in the ledger.
+- Do not duplicate pages when re-ingesting — update the pages recorded in the ledger.

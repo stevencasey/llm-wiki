@@ -27,6 +27,7 @@ Don't hand-edit `openspec/specs/` directly — it's the merge target for approve
 ```
 defaults/CLAUDE.md, schema.md   the wiki's own spec (copied into a user's wiki during
                                  setup — not this project's dev instructions)
+defaults/skills/query/          the /query Claude Code skill shipped with a user's wiki
 openspec/config.yaml            constitution
 openspec/specs/                 current specs, one folder per domain
 openspec/changes/               in-flight change proposals
