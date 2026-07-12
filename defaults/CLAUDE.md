@@ -75,7 +75,7 @@ date_published: YYYY-MM-DD
 url: https://...          # or isbn: 978-...
 ```
 
-**entity and concept pages that came from a source** — add:
+**entity and concept pages that came from a source** — encouraged, not required:
 ```yaml
 provenance: [[source-slug]]
 ```
@@ -159,19 +159,17 @@ Entries within each section are alphabetical, except Sources (reverse-chronologi
 
 ---
 
-## Standard Lint Checklist
+## Lint Checklist
 
-Run after every ingest. Checks 1–3 are blockers: do not report success until they pass. Check 4 is a warning: report it but do not block.
+Run after every ingest. Fix every problem inline before reporting the ingest complete — never ask the user to fix these themselves.
 
-1. **Orphan check** — every page in `entities/`, `concepts/`, and `synthesis/` has at least one inbound `[[slug]]` link from another page. Pages in `notes/` are exempt.
-2. **Broken links** — every `[[slug]]` in any page resolves to an existing `.md` file. Applies to all page types including notes.
-3. **Missing frontmatter** — every page has all required base fields plus any type-specific fields. Applies to all page types including notes.
-4. **Missing provenance** *(warning only)* — entity and concept pages with no `provenance:` field and no inbound link from a source page. Pages in `notes/` are exempt.
+1. **Broken links** — every `[[slug]]` resolves to an existing `.md` file. Create a stub if not.
+2. **Missing frontmatter** — every page has all required fields for its type. Add what's missing.
+3. **Orphaned pages** — every page in `entities/`, `concepts/`, and `synthesis/` has at least one inbound `[[slug]]` link. Pages in `notes/` are exempt. Add a link, or note it in your completion summary if no natural link exists yet.
 
-Report blockers as: `LINT FAIL [check-name]: path/to/file.md — reason`
-Report warnings as: `LINT WARN [check-name]: path/to/file.md — reason`
+Report what you fixed as: `FIXED [check-name]: path/to/file.md — what you did`.
 
-**When a blocker fails:** fix it inline before finishing. Create missing stubs, add missing frontmatter, add the missing index entry. Do not ask the user — resolve it and note what was fixed in your completion summary.
+This is one flat checklist, not a system of severities. If real use shows you need more nuance (e.g. distinguishing must-fix from nice-to-have), that's a signal to update this file — don't build the distinction preemptively.
 
 ---
 

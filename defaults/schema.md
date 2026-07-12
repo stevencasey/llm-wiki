@@ -129,7 +129,7 @@ Or `isbn:` instead of `url:` for books. `date_published` is when the source was 
 provenance: [[source-slug]]
 ```
 
-This field answers "how did this page come to exist?" Add it when the entity or concept page was first created because of a specific source. If the page was created from a personal note rather than an external source, use the note's slug (`provenance: [[2026-07-11]]`). If the page predates your wiki's source tracking, it is acceptable to omit it, but try to add it retroactively.
+This field answers "how did this page come to exist?" It's encouraged, not required — add it when convenient, but the lint check does not enforce it. If it turns out you rely on this for navigation once the wiki grows, that's a signal to make it a required field later; don't enforce it before you know you need it.
 
 ### Note-specific field
 
@@ -190,28 +190,28 @@ Use `[[slug]]` wikilinks throughout. The slug is the filename without `.md`.
 
 ## Lint
 
-The lint step is the ingestion evaluator. It runs after every ingest and must pass before the ingest is considered complete.
+The lint step is the ingestion quality gate. It runs after every ingest, and Claude
+fixes what it finds before the ingest is considered complete.
 
-### Standard lint (every ingest)
+| Check | Applies to | What it catches |
+|---|---|---|
+| Broken link check | all | `[[slug]]` references to missing files |
+| Missing frontmatter | all | Pages lacking required fields |
+| Orphan check | entities, concepts, synthesis | Pages no other page links to |
 
-Checks 1–3 block the ingest and must be fixed inline before finishing. Check 4 is a warning — reported but does not block.
+Notes are exempt from the orphan check — they are the origin of content, not a
+reference target.
 
-| Check | Severity | Applies to | What it catches |
-|---|---|---|---|
-| Orphan check | Blocker | entities, concepts, synthesis | Pages no other page links to |
-| Broken link check | Blocker | all | `[[slug]]` references to missing files |
-| Missing frontmatter | Blocker | all | Pages lacking required fields |
-| Missing provenance | Warning | entities, concepts | Pages with no traceable origin |
+This is deliberately one flat list rather than a severity taxonomy (blockers vs.
+warnings) or a contradiction-detection system. Both of those are real ideas worth
+having eventually — but only once real use has shown the flat version isn't enough.
+Building that structure in before a single page exists is exactly the kind of premature
+process this schema is trying to avoid. If you find yourself wanting it, that's the
+signal to add it, not a reason to have built it up front.
 
-Notes are exempt from the orphan check — they are the origin of content, not a reference target. Notes are also exempt from the provenance check for the same reason. Both blocker checks (broken links, missing frontmatter) apply to notes.
-
-The provenance check is a warning rather than a blocker because early-stage wikis will frequently have pages created before the source tracking was in place. It becomes more meaningful once the `sources/` layer is populated.
-
-**When a lint blocker fires**, Claude fixes it inline — creates the missing stub, adds the missing frontmatter, adds the missing index entry — and notes what was fixed in the completion summary. The user does not need to intervene.
-
-### Contradiction detection
-
-Contradiction detection between pages requires an LLM to read both pages and reason about them — grep-based heuristics (like "pages sharing 2+ tags") produce too many false positives to be useful. This check belongs in the evaluation loop (subsystem 3), not in schema lint. Do not implement it here.
+**When a lint problem fires**, Claude fixes it inline — creates the missing stub, adds
+the missing frontmatter, adds the missing index entry — and notes what was fixed in the
+completion summary. The user does not need to intervene.
 
 ---
 

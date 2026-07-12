@@ -2,26 +2,44 @@ schema: spec-driven
 
 context: |
   Project: llm-wiki
-  An open-source personal knowledge base where Claude is the primary reader and writer.
-  Non-technical users are the primary target — they interact via Claude Desktop chat.
-  Technical users may edit wiki/CLAUDE.md and wiki/schema.md to customise behaviour.
+  A compounding personal knowledge base built entirely through conversation with Claude.
+  You tell Claude about something you read or a thought you had; Claude organises it
+  into cross-linked wiki pages and keeps an index, so knowledge compounds instead of
+  piling up as disconnected notes.
 
-  Tech stack: Python (uv), Claude API (claude-sonnet-5 or latest Sonnet), MCP protocol
-  Package manager: uv
-  Entry point CLI: `wiki` (wiki init, wiki ingest, wiki serve, wiki lint)
+  Origin: adapted from Andrej Karpathy's personal LLM-wiki pattern (a CLAUDE.md schema,
+  markdown pages, index-first navigation, no vector database). See
+  openspec/explorations/ for the comparison and the rationale behind the tier split
+  below.
 
-  Three subsystems (PLAN.md):
-    1. Ingest pipeline — quality gate; validates and propagates a new source into the wiki
-    2. MCP file system server — ls, read, grep, search primitives over the wiki directory
-    3. Eval loop (phase 2) — LLM-as-Judge against a golden dataset; proposes schema changes
+  Two tiers, built in order:
 
-  Phase 1 scope: subsystems 1 and 2, plus the wiki schema (CLAUDE.md / schema.md).
-  Phase 2 scope: subsystem 3 (eval loop) and the self-improvement agent.
+  Tier 1 — Starting point (build first, validate by using it yourself)
+    A technical user runs this today with zero custom software: a wiki folder, the
+    defaults/CLAUDE.md and defaults/schema.md files, and Claude Desktop or Claude Code
+    connected to that folder via the official filesystem MCP server
+    (@modelcontextprotocol/server-filesystem) or direct local file access. Ingest and
+    capture are Claude following defaults/CLAUDE.md inside the chat session — no
+    separate backend, no API calls outside the conversation, no CLI.
 
-  Wiki directory structure (user-owned, separate from project code):
+  Tier 2 — Non-technical enablement (build only after Tier 1 is validated by real use)
+    Removes every piece of Tier 1 setup that assumes technical comfort: manual MCP
+    config, git, terminal use. Scope and mechanism are intentionally undecided — see
+    openspec/specs/onboarding/spec.md. Don't infer a CLI, a Python package, or any
+    other implementation from this document until that spec decides it.
+
+  Product language (use these terms consistently across all specs):
+  - "ingest" not "import" or "process" — for adding an external source to the wiki
+  - "capture" not "create" or "write" — for adding a personal note
+  - "lint" not "validate" or "check" — for the ingest quality gate
+  - "index" not "table of contents" or "summary" — for index.md
+  - "wiki" not "knowledge base" or "vault" in user-facing text
+  - "page" not "file" or "document" in user-facing text
+
+  Wiki directory structure (user-owned, separate from project code, same in both tiers):
     wiki-root/
-      CLAUDE.md       ← agent operational spec (copied from defaults/ on wiki init)
-      schema.md       ← human schema reference (copied from defaults/ on wiki init)
+      CLAUDE.md       ← agent operational spec (copied from defaults/ on setup)
+      schema.md       ← human schema reference (copied from defaults/ on setup)
       index.md        ← master navigation index, auto-maintained
       entities/       ← named things: people, companies, tools, places
       concepts/       ← abstract ideas, frameworks, methodologies
@@ -29,48 +47,40 @@ context: |
       synthesis/      ← cross-cutting analyses spanning 2+ sources
       notes/          ← personal capture: daily notes, meetings, fleeting thoughts
 
-  Product language (use these terms consistently across all specs):
-  - "ingest" not "import" or "process" — for adding an external source to the wiki
-  - "capture" not "create" or "write" — for adding a personal note
-  - "promote" not "move" or "convert" — for elevating note content to the main taxonomy
-  - "lint" not "validate" or "check" — for running the quality gate checks
-  - "index" not "table of contents" or "summary" — for index.md
-  - "wiki" not "knowledge base" or "vault" in user-facing text
-  - "page" not "file" or "document" in user-facing text
+  Architectural constraints (non-negotiable, both tiers):
+  - No vector embeddings. The no-vector bet is intentional. A BM25 search primitive may
+    be added later if real usage shows the index alone doesn't scale — not before.
+  - Index-first navigation: Claude reads index.md before opening individual pages.
+  - No custom backend, server, or API-calling service in Tier 1. If a spec proposes one,
+    it belongs in Tier 2 and must justify why chat + filesystem access can't do it.
+  - The wiki is a separate directory from the project code.
 
-  Architectural constraints (non-negotiable):
-  - No vector embeddings. The no-vector bet is intentional. BM25 is acceptable.
-  - Index-first navigation: the LLM reads index.md before opening individual pages.
-  - The 5-step ingest procedure in wiki/CLAUDE.md is canonical; do not shortcut it.
-  - Lint blockers (orphan, broken links, missing frontmatter) must be fixed inline by Claude.
-  - Lint warnings (missing provenance) are reported but do not block ingest completion.
-  - notes/ pages are exempt from orphan and provenance lint checks.
-  - The wiki is a separate directory from the project code; `wiki init <path>` creates it.
-
-  Non-technical user baseline:
+  Non-technical user baseline (Tier 2 target, not assumed in Tier 1):
   - Assume the user knows what Claude Desktop is but not what MCP or YAML mean.
-  - The primary interaction is: paste a URL or describe a thought in chat; Claude handles the rest.
+  - The primary interaction is: paste a URL or describe a thought in chat.
   - Error messages must be in plain English with a suggested next action.
-  - The inbox/ drop folder is a secondary capture channel, not the primary one.
 
 rules:
   specs:
     - Write requirements as observable user outcomes, not implementation steps.
-    - Use wiki product language (ingest, capture, promote, lint, index, page) throughout.
-    - The primary persona is a non-technical user interacting via Claude Desktop chat.
+    - Use wiki product language (ingest, capture, lint, index, page) throughout.
+    - State which tier a requirement belongs to. Tier 2 requirements must not assume a
+      specific tech stack, language, or packaging format unless a Tier 2 spec has
+      already decided it.
+    - Don't add process (severity taxonomies, lifecycle fields, structured workflows)
+      that hasn't been shown necessary by actually using the wiki. If you're speculating
+      about a future failure mode, say so explicitly and mark it deferred.
     - Every spec must include a "User-facing behaviour" section and a "Constraints" section.
-    - Constraints must call out any architectural non-negotiables that apply (no vectors, index-first, etc.).
-    - Phase 2 features must be explicitly labelled "(phase 2)" and excluded from phase 1 specs.
-    - Lint behaviour must be specified in terms of blockers vs. warnings, not pass/fail.
   design:
-    - No vector embeddings. If a design proposes embeddings, reject it and use BM25 or index-first instead.
-    - Prefer the Python standard library and the Anthropic SDK; avoid heavyweight frameworks.
-    - File paths must use pathlib.Path, never string concatenation with slashes.
-    - The wiki directory is always passed as a parameter, never assumed or hardcoded.
-    - MCP server tools must be idempotent — calling the same tool twice must not corrupt the wiki.
-    - Any Claude API call must specify model, max_tokens, and temperature explicitly; no defaults.
+    - No vector embeddings in Tier 1.
+    - Tier 1 has no custom server or backend — Claude interacts with the wiki directly
+      through filesystem access. Don't design a bespoke MCP tool that only re-implements
+      generic file operations (ls/read/grep) already available.
+    - Tier 2's tech stack is not yet decided. Do not default to Python, Node, or any
+      other stack without an explicit Tier 2 spec making that call.
   tasks:
-    - Each task must be independently verifiable — it should be possible to check it done without running the full system.
-    - Include a verification step: "open Claude Desktop, ingest [example URL], confirm index.md updated."
-    - Flag any task that touches wiki/CLAUDE.md or wiki/schema.md — these are the spec's source of truth and changes require deliberate review.
-    - Phase 2 tasks must not be created until phase 1 is complete and eval loop design is approved.
+    - Each task must be independently verifiable without running a full system.
+    - Tier 1 tasks must be verifiable using only Claude Desktop/Claude Code and a local
+      folder — no build step.
+    - Don't create Tier 2 tasks until Tier 1 has been used for real and its actual gaps
+      (not guessed ones) are known.
