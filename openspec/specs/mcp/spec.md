@@ -1,44 +1,34 @@
-# MCP File System Server Spec
+# Wiki Access Spec (Tier 1)
 
-The MCP server exposes the user's wiki directory to Claude Desktop as a set of
-file system primitives. It is the query interface for subsystem 2.
+Tier 1 needs no custom server. Claude accesses the wiki directory the same way it
+accesses any local folder: through the official filesystem MCP server
+(`@modelcontextprotocol/server-filesystem`) pointed at the wiki root, or direct local
+file access when running in Claude Code. This spec records what's needed *beyond*
+generic file access — not a reimplementation of ls/read/grep, which already exist.
 
 ---
 
 ## User-facing behaviour
 
-When connected via Claude Desktop, the user can ask Claude questions about their wiki
-and Claude will use the MCP tools to navigate and retrieve the relevant pages.
+- Claude reads `index.md` before opening individual pages on any wiki query — this is a
+  `CLAUDE.md` instruction (see `defaults/CLAUDE.md`), not a tool-level restriction.
+- No additional tooling is required for Tier 1. Generic filesystem list/read/search
+  operations are sufficient at the scale a personal wiki reaches early on (a few hundred
+  pages — see `openspec/explorations/deep-analysis.md` for the research behind that
+  ceiling).
 
-The server exposes these tools:
+---
 
-**`wiki_ls <directory>`** — Lists pages in a wiki directory (entities/, concepts/, etc.)
-with their titles from frontmatter. Calling with no argument lists the root.
+## Deferred: a search primitive
 
-**`wiki_read <slug>`** — Returns the full content of a page by slug (filename without
-`.md`). Resolves the correct directory from the page's type or by searching all directories.
-
-**`wiki_grep <pattern>`** — Full-text search across all wiki pages. Returns matching
-lines with their file paths and surrounding context.
-
-**`wiki_search <query>`** — BM25 keyword search across page titles, tags, and body text.
-Returns ranked results with one-line descriptions. This is the preferred tool for
-open-ended queries; `wiki_grep` is for exact-match lookups.
-
-**`wiki_index`** — Returns the full content of `index.md`. This is the first tool Claude
-should call on any query — it provides a map of the wiki before opening individual pages.
+If real usage shows the index plus generic file tools no longer surface the right
+pages, add a `search(query)` capability using BM25 — not vector embeddings. This is
+explicitly deferred, not a Tier 1 requirement. Don't build it speculatively.
 
 ---
 
 ## Constraints
 
-- All tools are read-only. No MCP tool may write to the wiki — writes happen through the
-  ingest pipeline only.
-- `wiki_search` must use BM25, not vector embeddings. The implementation must be
-  deterministic and produce the same ranking for the same query and corpus.
-- Tools must return plain text (markdown). No JSON wrappers in the tool response body.
-- If a slug does not resolve to an existing page, `wiki_read` returns a clear error
-  message, not an empty response or a stack trace.
-- The server must start in under 2 seconds on a standard laptop with a 500-page wiki.
-- Phase 2 addition: `wiki_suggest` — proposes schema improvements based on eval loop
-  output. Not in scope for phase 1.
+- No vector embeddings, ever, at any tier.
+- No custom MCP server for Tier 1. If a future spec proposes one, it must justify what
+  generic file access and the official filesystem server can't already do.

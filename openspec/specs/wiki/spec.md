@@ -8,6 +8,9 @@ The canonical operational spec for Claude is `wiki/CLAUDE.md` inside the user's 
 directory. The canonical human reference is `wiki/schema.md`. This spec describes the
 contract those files must fulfil — not the files themselves.
 
+This schema is identical in Tier 1 and Tier 2 (see `openspec/config.yaml`) — only how a
+user gets set up and connected to Claude differs between tiers, not the wiki itself.
+
 ---
 
 ## User-facing behaviour
@@ -40,20 +43,18 @@ every ingest and every new daily note. It is the primary navigation tool for the
 
 ## Lint contract
 
-The quality gate runs after every ingest. Results are classified as blockers or warnings.
+The quality gate runs after every ingest. Claude fixes every problem it finds inline
+before reporting the ingest complete — it does not ask the user to fix these itself.
 
-**Blockers** (ingest does not complete until resolved — Claude resolves inline):
-- Broken wikilinks: any `[[slug]]` where `slug.md` does not exist
-- Missing frontmatter: any page missing a required field for its type
-- Orphaned pages: any entity, concept, or synthesis page with zero inbound wikilinks
+- Broken wikilinks: any `[[slug]]` where `slug.md` does not exist — create a stub
+- Missing frontmatter: any page missing a required field for its type — add it
+- Orphaned pages: any entity, concept, or synthesis page with zero inbound wikilinks —
+  add a link, or note it in the completion summary if no natural link exists yet.
+  Note pages are exempt from this check.
 
-**Warnings** (reported, do not block):
-- Missing provenance: entity or concept pages with no `provenance:` field and no inbound
-  link from a source page
-
-**Exemptions:**
-- Note pages are exempt from the orphan check
-- Note pages are exempt from the provenance warning
+This is deliberately one flat list, not a taxonomy of severities. Add distinctions
+(blockers vs. warnings, provenance tracking, etc.) only once real use shows the flat
+version isn't enough — don't build that structure speculatively.
 
 ---
 
@@ -69,11 +70,12 @@ from the `## Notes` section of `index.md`.
 
 ## Constraints
 
-- No vector embeddings at any layer of the schema or lint implementation.
+- No vector embeddings at any layer of the schema or lint implementation, in either tier.
 - The schema is defined in `wiki/CLAUDE.md` (agent-facing) and `wiki/schema.md`
   (human-facing). Both files travel with the user's wiki, not with the project code.
 - Default copies of both files live in `defaults/` in the project repo and are copied
-  into the user's wiki on `wiki init`. The user may edit their copies freely.
+  into the user's wiki during setup (mechanism defined by the tier — see
+  `openspec/config.yaml`). The user may edit their copies freely.
 - The project must never overwrite a user's edited `CLAUDE.md` or `schema.md` on upgrade.
 - The five content directories are fixed. No other directories may be created inside the
   wiki root by the system.
